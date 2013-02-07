@@ -294,7 +294,39 @@ Version: @@ver@@ Timestamp: @@timestamp@@
 .select2-dropdown-open .select2-choice div b {
     background-position: -18px 1px;
 }
+/* filters */
+.select2-attr-filter {
+  margin: 4px 4px 4px 0;
+  padding: 0 0 0 4px;
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 200px;
+  border-top: 1px solid #ccc;
+  border-bottom: 1px solid  #ccc;
+  
+}
 
+.select2-filter-header {
+    font-weight: bold;
+    padding: 2px;
+    background-color: #dddddd;
+}
+
+.select2-attr-filter input {
+    display: inline;
+    margin: 0px;
+    margin-right: 5px;
+    margin-top: -2px;
+}
+
+.select2-attr-filter label {
+    display: inline;    
+}
+
+.select2-attr-filter li {
+    margin-top: 3px;    
+}
 /* results */
 .select2-results {
     max-height: 200px;

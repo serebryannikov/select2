@@ -568,6 +568,7 @@ the specific language governing permissions and limitations under the Apache Lic
             this.dropdown.data("select2", this);
 
             this.results = results = this.container.find(resultsSelector);
+            this.attrFilter = attrFilter = this.container.find(filterSelector);
             this.search = search = this.container.find("input.select2-input");
 
             search.attr("tabIndex", this.elementTabIndex);
@@ -719,6 +720,73 @@ the specific language governing permissions and limitations under the Apache Lic
                     };
 
                     populate(results, container, 0);
+                },
+                populateFilters: function (attrFilter, filters, results, searchStr) {
+                    
+                    var i, l, filter, textL, node, chbox, label;
+                    if (filters.length > 0) {
+                        node = $("<li></li>");
+                        node.addClass("select2-results-dept-" + 0);
+                        node.addClass("select2-result");
+                        node.addClass("select2-result-unselectable");
+                        
+                        label = $("<div></div>");
+                        label.addClass("select2-result-label");
+                        label.addClass("select2-filter-header");
+
+                        label.html(opts.subFilterHeader);
+
+                        node.append(label);
+
+                        attrFilter.append(node);
+                    }
+                    for (i = 0, l = filters.length; i < l; i = i + 1) {
+
+                        filter = filters[i];
+
+                        node = $("<li></li>");
+                        node.addClass("select2-results-dept-" + 0);
+                        node.addClass("select2-result");
+                        node.addClass("select2-result-unselectable");
+
+
+
+                        chbox = $("<input type='checkbox' />");
+                        var that = this;
+                        chbox.attr("id", "id_" + filter);
+                        chbox.attr("data-val", filter);
+                        chbox.attr("checked", $.inArray(filter.toString(), opts.selectedTypes) >= 0);
+
+                        chbox.bind("click", function () {
+                            if (this.checked) {                                
+                                if ($.inArray(this.attributes["data-val"].value, opts.selectedTypes) == -1) {
+                                    opts.selectedTypes.push(this.attributes["data-val"].value);
+                                    that.clearPlaceholder();
+                                    that.updateResults(true);
+                                }
+                            } else {
+                                if ($.inArray(this.attributes["data-val"].value, opts.selectedTypes) >= 0) {
+                                    opts.selectedTypes.splice($.inArray(this.attributes["data-val"].value, opts.selectedTypes), 1);
+                                    that.clearPlaceholder();
+                                    that.updateResults(true);
+                                }
+                            }
+                        });
+
+                        label = $("<div></div>");
+                        label.addClass("select2-result-label");
+
+                        textL = $("<label></label>");
+                        textL.attr("for", "id_" + filter);
+                        textL.html(filter);
+
+                        label.append(chbox);
+                        label.append(textL);
+
+                        node.append(label);
+
+                        attrFilter.append(node);
+                    }
                 }
             }, $.fn.select2.defaults, opts);
 
@@ -736,15 +804,19 @@ the specific language governing permissions and limitations under the Apache Lic
 
             if (select) {
                 opts.query = this.bind(function (query) {
-                    var data = { results: [], more: false },
+                    var data = { results: [],filters: [], more: false },
                         term = query.term,
                         children, firstChild, process;
 
-                    process=function(element, collection) {
+                    process = function (element, collection, filters) {
+                        
                         var group;
                         if (element.is("option")) {
-                            if (query.matcher(term, element.text(), element)) {
+                            if (query.matcher(term, element.text(), element) && (!opts.useSubFilter || opts.selectedTypes.length == 0 || $.inArray(element.attr(opts.subFilterAttribute).toString(), opts.selectedTypes) >= 0)) { 
                                 collection.push({id:element.attr("value"), text:element.text(), element: element.get(), css: element.attr("class"), disabled: equal(element.attr("disabled"), "disabled") });
+                            }
+                            if (opts.useSubFilter && opts.subFilterAttribute != "" && $.inArray(element.attr(opts.subFilterAttribute), filters) == -1) {
+                                filters.push(element.attr(opts.subFilterAttribute).toString());
                             }
                         } else if (element.is("optgroup")) {
                             group={text:element.attr("label"), children:[], element: element.get(), css: element.attr("class")};
@@ -765,7 +837,7 @@ the specific language governing permissions and limitations under the Apache Lic
                         }
                     }
 
-                    children.each2(function(i, elm) { process(elm, data.results); });
+                    children.each2(function (i, elm) { process(elm, data.results, data.filters); });
 
                     query.callback(data);
                 });
@@ -1185,6 +1257,7 @@ the specific language governing permissions and limitations under the Apache Lic
         // abstract
         loadMoreIfNeeded: function () {
             var results = this.results,
+                attrFilter = this.attrFilter,
                 more = results.find("li.select2-more-results"),
                 below, // pixels the element is below the scroll fold, below==0 is when the element is starting to be visible
                 offset = -1, // index of first element without data
@@ -1208,8 +1281,8 @@ the specific language governing permissions and limitations under the Apache Lic
                     // ignore a response if the select2 has been closed before it was received
                     if (!self.opened()) return;
 
-
-                    self.opts.populateResults.call(this, results, data.results, {term: term, page: page, context:context});
+                    self.opts.populateFilters.call(this, attrFilter, data.filters, results, search.val());
+                    self.opts.populateResults.call(this, results, data.results, { term: term, page: page, context: context });                    
 
                     if (data.more===true) {
                         more.detach().appendTo(results).text(self.opts.formatLoadMore(page+1));
@@ -1235,8 +1308,7 @@ the specific language governing permissions and limitations under the Apache Lic
          */
         // abstract
         updateResults: function (initial) {
-            var search = this.search, results = this.results, opts = this.opts, data, self=this, input;
-
+            var search = this.search, results = this.results, opts = this.opts, data, self=this, input,attrFilter = this.attrFilter;
             // if the search is currently hidden we do not alter the results
             if (initial !== true && (this.showSearchInput === false || !this.opened())) {
                 return;
@@ -1324,6 +1396,8 @@ the specific language governing permissions and limitations under the Apache Lic
                 }
 
                 results.empty();
+                attrFilter.empty();
+                self.opts.populateFilters.call(this, attrFilter, data.filters, results, search.val());
                 self.opts.populateResults.call(this, results, data.results, {term: search.val(), page: this.resultsPage, context:null});
 
                 if (data.more === true && checkFormatter(opts.formatLoadMore, "formatLoadMore")) {
@@ -1876,6 +1950,8 @@ the specific language governing permissions and limitations under the Apache Lic
                 "  </li>" ,
                 "</ul>" ,
                 "<div class='select2-drop select2-drop-multi' style='display:none;'>" ,
+                "   <ul class='select2-attr-filter'>",
+                "   </ul>",
                 "   <ul class='select2-results'>" ,
                 "   </ul>" ,
                 "</div>"].join(""));
@@ -2457,7 +2533,7 @@ the specific language governing permissions and limitations under the Apache Lic
             if (args.length === 0 || typeof(args[0]) === "object") {
                 opts = args.length === 0 ? {} : $.extend({}, args[0]);
                 opts.element = $(this);
-
+                opts.selectedTypes = [];
                 if (opts.element.get(0).tagName.toLowerCase() === "select") {
                     multiple = opts.element.attr("multiple");
                 } else {
@@ -2544,7 +2620,10 @@ the specific language governing permissions and limitations under the Apache Lic
             });
         },
         blurOnChange: false,
-        selectOnBlur: false
+        selectOnBlur: false,
+        useSubFilter: false,
+        subFilterHeader: "Filter",
+        subFilterAttribute: "",
     };
 
     // exports
